@@ -11,6 +11,7 @@ REST API for the Ghanim Enterprises e-commerce platform built with **Spring Boot
 ---
 
 ## 🔗 Related Repositories
+
 - **Frontend**: [ecommerce-angular-springboot](https://github.com/Inscode/ecommerce-angular-springboot)
 
 ---
