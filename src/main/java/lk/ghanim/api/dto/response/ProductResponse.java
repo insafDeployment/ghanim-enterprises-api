@@ -1,4 +1,4 @@
-package lk.ghanim.api.response;
+package lk.ghanim.api.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

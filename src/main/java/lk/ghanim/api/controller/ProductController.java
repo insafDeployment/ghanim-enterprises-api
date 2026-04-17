@@ -1,8 +1,8 @@
 package lk.ghanim.api.controller;
 
 import jakarta.validation.Valid;
-import lk.ghanim.api.request.ProductRequest;
-import lk.ghanim.api.response.ProductResponse;
+import lk.ghanim.api.dto.request.ProductRequest;
+import lk.ghanim.api.dto.response.ProductResponse;
 import lk.ghanim.api.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -1,4 +1,4 @@
-package lk.ghanim.api.request;
+package lk.ghanim.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

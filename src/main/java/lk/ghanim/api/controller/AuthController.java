@@ -1,9 +1,9 @@
 package lk.ghanim.api.controller;
 
 import jakarta.validation.Valid;
-import lk.ghanim.api.request.AuthResponse;
-import lk.ghanim.api.request.LoginRequest;
-import lk.ghanim.api.request.RegisterRequest;
+import lk.ghanim.api.dto.response.AuthResponse;
+import lk.ghanim.api.dto.request.LoginRequest;
+import lk.ghanim.api.dto.request.RegisterRequest;
 import lk.ghanim.api.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

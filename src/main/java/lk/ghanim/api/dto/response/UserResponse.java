@@ -1,6 +1,5 @@
-package lk.ghanim.api.request;
+package lk.ghanim.api.dto.response;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,11 +9,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuthResponse {
-    private String token;
-    private String email;
+public class UserResponse {
+    private Long id;
     private String firstName;
     private String lastName;
+    private String email;
+    private String phone;
     private String role;
-    private String message;
+    private String businessName;
+    private boolean active;
 }

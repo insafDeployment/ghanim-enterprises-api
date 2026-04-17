@@ -1,4 +1,4 @@
-package lk.ghanim.api.response;
+package lk.ghanim.api.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,13 +9,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserResponse {
-    private Long id;
+public class AuthResponse {
+    private String token;
+    private String email;
     private String firstName;
     private String lastName;
-    private String email;
-    private String phone;
     private String role;
-    private String businessName;
-    private boolean active;
+    private String message;
 }
