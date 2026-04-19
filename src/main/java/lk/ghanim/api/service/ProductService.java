@@ -108,7 +108,7 @@ public class ProductService {
         productRepository.save(product);
     }
 
-    private ProductResponse toResponse(Product product) {
+    public ProductResponse toResponse(Product product) {
         boolean isWholesale = isCurrentUserWholesale();
 
         return ProductResponse.builder()

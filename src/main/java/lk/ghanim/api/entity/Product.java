@@ -65,4 +65,7 @@ public class Product {
         SALE, NEW, BEST_SELLER
     }
 
+    @Column(columnDefinition = "vector(384)")
+    private String embedding;
+
 }

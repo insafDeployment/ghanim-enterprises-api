@@ -6,6 +6,7 @@ import lk.ghanim.api.entity.User;
 import lk.ghanim.api.repository.CategoryRepository;
 import lk.ghanim.api.repository.ProductRepository;
 import lk.ghanim.api.repository.UserRepository;
+import lk.ghanim.api.service.SmartSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,12 +23,14 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoryRepository categoryRepository;
     private final PasswordEncoder passwordEncoder;
     private final ProductRepository productRepository;
+    private final SmartSearchService smartSearchService;
 
     @Override
     public void run(String... args) {
         initCategories();
         initAdminUser();
         initProducts();
+        generateEmbeddings();
     }
 
     private void initCategories() {
@@ -319,5 +322,24 @@ public class DataInitializer implements CommandLineRunner {
 
         productRepository.saveAll(products);
         System.out.println("✅ " + products.size() + " products initialized");
+    }
+
+    private void generateEmbeddings() {
+        long productsWithoutEmbedding = productRepository
+                .findByActiveTrue()
+                .stream()
+                .filter(p -> p.getEmbedding() == null
+                        || p.getEmbedding().isBlank())  // ✅ add isBlank check
+                .count();
+
+        if (productsWithoutEmbedding == 0) {
+            System.out.println("✅ All products already have embeddings");
+            return;
+        }
+
+        System.out.println("⏳ Generating embeddings for " +
+                productsWithoutEmbedding + " products...");
+        smartSearchService.generateEmbeddingsForAllProducts();
+        System.out.println("✅ Embeddings ready");
     }
 }
