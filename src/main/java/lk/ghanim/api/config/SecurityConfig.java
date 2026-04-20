@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/**").permitAll()
                         .requestMatchers("/api/categories/**").permitAll()
                         .requestMatchers("/api/search/**").permitAll()
+                        .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/my").authenticated()
                         // Admin only
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
