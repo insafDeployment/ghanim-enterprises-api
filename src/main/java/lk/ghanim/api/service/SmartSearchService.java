@@ -7,6 +7,7 @@ import lk.ghanim.api.repository.ProductRepository;
 import lk.ghanim.api.repository.ProductSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,6 +22,7 @@ public class SmartSearchService {
     private final ProductSearchRepository searchRepository;
     private final ProductRepository productRepository;
     private final ProductService productService;
+    private final JdbcTemplate jdbcTemplate;
 
     public List<ProductResponse> smartSearch(
             String query, int limit) {
@@ -81,19 +83,31 @@ public class SmartSearchService {
 
     @Transactional
     public void generateEmbeddingsForAllProducts() {
-        List<Product> products = productRepository.findByActiveTrue();
-        log.info("Generating embeddings for {} products", products.size());
+        // Get IDs of products without embeddings from DB directly
+        List<Long> productIdsWithoutEmbedding = jdbcTemplate.queryForList(
+                "SELECT id FROM products WHERE embedding IS NULL AND active = true",
+                Long.class
+        );
+
+        log.info("Generating embeddings for {} products",
+                productIdsWithoutEmbedding.size());
+
+        if (productIdsWithoutEmbedding.isEmpty()) {
+            log.info("All products already have embeddings");
+            return;
+        }
 
         // Warm up model
-        log.info("Warming up Hugging Face model...");
+        log.info("Warming up HuggingFace model...");
         embeddingService.generateEmbedding("warmup");
-        try { Thread.sleep(8000); } catch (InterruptedException e) {
+        try {
+            Thread.sleep(8000);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
 
-        products.forEach(product -> {
-            if (product.getEmbedding() == null ||
-                    product.getEmbedding().isBlank()) {
+        productIdsWithoutEmbedding.forEach(id -> {
+            productRepository.findById(id).ifPresent(product -> {
 
                 boolean success = false;
 
@@ -107,10 +121,10 @@ public class SmartSearchService {
                     );
 
                     if (embedding != null) {
-                        // ✅ Update DB directly
                         searchRepository.updateProductEmbedding(
-                                product.getId(), embedding);
-                        log.info("Embedding generated for product: {}",
+                                product.getId(), embedding
+                        );
+                        log.info("✅ Embedding saved for: {}",
                                 product.getName());
                         success = true;
                         break;
@@ -126,16 +140,18 @@ public class SmartSearchService {
                 }
 
                 if (!success) {
-                    log.error("Failed all attempts for product: {}",
+                    log.error("❌ All attempts failed for: {}",
                             product.getName());
                 }
 
-                try { Thread.sleep(300); } catch (InterruptedException e) {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-            }
+            });
         });
 
-        log.info("All embeddings generated");
+        log.info("✅ Embedding generation complete");
     }
 }
