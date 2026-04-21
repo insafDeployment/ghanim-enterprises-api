@@ -1,6 +1,5 @@
 package lk.ghanim.api.service;
 
-
 import lk.ghanim.api.dto.request.ChatRequest;
 import lk.ghanim.api.dto.response.ChatResponse;
 import lk.ghanim.api.entity.Product;
@@ -15,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,38 +40,36 @@ public class ChatbotService {
 
         for (int i = 0; i < maxRetries; i++) {
             try {
+                // ① Build system instruction (rules & context)
                 String systemPrompt = buildSystemPrompt();
-                String fullPrompt = buildFullPrompt(
-                        request, systemPrompt
-                );
 
-                String url = geminiApiUrl + "?key=" + geminiApiKey;
+                // ② Build structured conversation
+                List<Map<String, Object>> contents = buildContents(request);
 
-                HttpHeaders headers = new HttpHeaders();
-
-                headers.setContentType(MediaType.APPLICATION_JSON);
-
+                // ③ Build the full request body
                 Map<String, Object> body = Map.of(
-                        "contents", List.of(
-                                Map.of(
-                                        "parts", List.of(
-                                                Map.of("text", fullPrompt)
-                                        )
+                        "systemInstruction", Map.of(
+                                "parts", List.of(
+                                        Map.of("text", systemPrompt)
                                 )
                         ),
+                        "contents", contents,
                         "generationConfig", Map.of(
                                 "maxOutputTokens", 800,
                                 "temperature", 0.7
                         )
                 );
 
+                String url = geminiApiUrl + "?key=" + geminiApiKey;
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
                 HttpEntity<Map<String, Object>> entity =
                         new HttpEntity<>(body, headers);
 
-                Map<String,Object> response =
-                        restTemplate.postForObject(
-                                url, entity, Map.class
-                        );
+                Map<String, Object> response =
+                        restTemplate.postForObject(url, entity, Map.class);
 
                 String reply = extractGeminiReply(response);
 
@@ -79,11 +77,14 @@ public class ChatbotService {
                         .message(reply)
                         .success(true)
                         .build();
+
             } catch (Exception e) {
                 log.warn("Attempt {} failed: {}", i + 1, e.getMessage());
                 if (i < maxRetries - 1) {
                     try { Thread.sleep(delayMs); }
-                    catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+                    catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
         }
@@ -92,12 +93,48 @@ public class ChatbotService {
                 .message("Sorry, I am having trouble right now. Please try again in a moment.")
                 .success(false)
                 .build();
-
     }
 
+    /**
+     * Builds the contents array - Gemini's native conversation format.
+     * Each message has a role ("user" or "model") and parts.
+     */
+    private List<Map<String, Object>> buildContents(ChatRequest request) {
+        List<Map<String, Object>> contents = new ArrayList<>();
+
+        // Add history messages (if any)
+        if (request.getHistory() != null && !request.getHistory().isEmpty()) {
+            for (ChatRequest.ChatMessage msg : request.getHistory()) {
+                // Gemini expects "user" or "model" (not "assistant")
+                String role = msg.getRole().equalsIgnoreCase("assistant")
+                        ? "model"
+                        : "user";
+
+                contents.add(Map.of(
+                        "role", role,
+                        "parts", List.of(
+                                Map.of("text", msg.getContent())
+                        )
+                ));
+            }
+        }
+
+        // Add the current user message
+        contents.add(Map.of(
+                "role", "user",
+                "parts", List.of(
+                        Map.of("text", request.getMessage())
+                )
+        ));
+
+        return contents;
+    }
+
+    /**
+     * System prompt contains rules and context - kept separate from conversation.
+     */
     private String buildSystemPrompt() {
-        List<Product> products =
-                productRepository.findByActiveTrue();
+        List<Product> products = productRepository.findByActiveTrue();
 
         String productList = products.stream()
                 .map(p -> String.format(
@@ -139,65 +176,34 @@ public class ChatbotService {
             - Keep responses under 100 words
             - Be friendly and helpful
             - If product not in list say we do not carry it
-            - IMPORTANT: Do NOT use markdown formatting,
-              asterisks, or bullet symbols in your response.
-              Use plain text only. Use line breaks to separate items.
+            - Use plain text only, no markdown.
+            - Put each product on its own line.
+            - Add blank lines between sections for readability.
             """.formatted(categories, productList);
     }
 
-    private String buildFullPrompt(
-            ChatRequest request, String systemPrompt) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append(systemPrompt).append("\n\n");
-
-        if (request.getHistory() != null &&
-                !request.getHistory().isEmpty()) {
-            prompt.append("CONVERSATION HISTORY:\n");
-            for (ChatRequest.ChatMessage msg :
-                    request.getHistory()) {
-                prompt.append(
-                        msg.getRole().toUpperCase()
-                ).append(": ").append(
-                        msg.getContent()
-                ).append("\n");
-            }
-            prompt.append("\n");
-        }
-
-        prompt.append("CUSTOMER: ")
-                .append(request.getMessage())
-                .append("\n\nASSISTANT:");
-
-        return prompt.toString();
-    }
-
-    private String extractGeminiReply(
-            Map<String, Object> response) {
+    @SuppressWarnings("unchecked")
+    private String extractGeminiReply(Map<String, Object> response) {
         try {
             if (response == null) return "No response";
 
             List<Map<String, Object>> candidates =
-                    (List<Map<String, Object>>)
-                            response.get("candidates");
+                    (List<Map<String, Object>>) response.get("candidates");
 
             if (candidates == null || candidates.isEmpty())
                 return "No response";
 
             Map<String, Object> content =
-                    (Map<String, Object>)
-                            candidates.get(0).get("content");
+                    (Map<String, Object>) candidates.get(0).get("content");
 
             List<Map<String, Object>> parts =
-                    (List<Map<String, Object>>)
-                            content.get("parts");
+                    (List<Map<String, Object>>) content.get("parts");
 
             return (String) parts.get(0).get("text");
 
         } catch (Exception e) {
-            log.error("Failed to extract reply: {}",
-                    e.getMessage());
+            log.error("Failed to extract reply: {}", e.getMessage());
             return "Sorry I could not process that.";
         }
     }
-
 }
