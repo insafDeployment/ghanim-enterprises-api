@@ -9,6 +9,7 @@ import lk.ghanim.api.repository.UserRepository;
 import lk.ghanim.api.service.SmartSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final ProductRepository productRepository;
     private final SmartSearchService smartSearchService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) {
@@ -325,12 +327,11 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void generateEmbeddings() {
-        long productsWithoutEmbedding = productRepository
-                .findByActiveTrue()
-                .stream()
-                .filter(p -> p.getEmbedding() == null
-                        || p.getEmbedding().isBlank())  // ✅ add isBlank check
-                .count();
+        long productsWithoutEmbedding = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM products WHERE embedding IS NULL AND active = true",
+                Long.class
+        );
+
 
         if (productsWithoutEmbedding == 0) {
             System.out.println("✅ All products already have embeddings");
