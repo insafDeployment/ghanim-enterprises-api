@@ -1,10 +1,12 @@
 package lk.ghanim.api.controller;
 
 
+import lk.ghanim.api.dto.response.AdminProductResponse;
 import lk.ghanim.api.dto.response.DashboardResponse;
 import lk.ghanim.api.dto.response.OrderResponse;
 import lk.ghanim.api.dto.response.UserResponse;
 import lk.ghanim.api.entity.User;
+import lk.ghanim.api.repository.ProductRepository;
 import lk.ghanim.api.repository.UserRepository;
 import lk.ghanim.api.service.DashboardService;
 import lk.ghanim.api.service.OrderService;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,12 +28,60 @@ public class AdminController {
     private final DashboardService dashboardService;
     private final OrderService orderService;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardResponse> getDashboard() {
         return ResponseEntity.ok(
                 dashboardService.getDashboardData()
         );
+    }
+
+    @GetMapping("/products")
+    public ResponseEntity<List<AdminProductResponse>>
+    getAdminProducts() {
+        List<AdminProductResponse> products =
+                productRepository.findByActiveTrue()
+                        .stream()
+                        .map(p -> {
+                            BigDecimal cost = p.getCostPrice() != null
+                                    ? p.getCostPrice()
+                                    : BigDecimal.ZERO;
+
+                            BigDecimal marginRetail = cost.compareTo(
+                                    BigDecimal.ZERO) > 0
+                                    ? p.getRetailPrice().subtract(cost)
+                                    : null;
+
+                            BigDecimal marginWholesale = cost.compareTo(
+                                    BigDecimal.ZERO) > 0
+                                    ? p.getWholesalePrice().subtract(cost)
+                                    : null;
+
+                            return AdminProductResponse.builder()
+                                    .id(p.getId())
+                                    .name(p.getName())
+                                    .description(p.getDescription())
+                                    .specifications(p.getSpecifications())
+                                    .retailPrice(p.getRetailPrice())
+                                    .wholesalePrice(p.getWholesalePrice())
+                                    .costPrice(p.getCostPrice())
+                                    .profitMarginRetail(marginRetail)
+                                    .profitMarginWholesale(marginWholesale)
+                                    .stock(p.getStock())
+                                    .emoji(p.getEmoji())
+                                    .imageUrl(p.getImageUrl())
+                                    .badge(p.getBadge() != null
+                                            ? p.getBadge().name() : null)
+                                    .categoryName(p.getCategory().getName())
+                                    .categorySlug(p.getCategory().getSlug())
+                                    .inStock(p.getStock() > 0)
+                                    .active(p.isActive())
+                                    .build();
+                        })
+                        .collect(Collectors.toList());
+
+        return ResponseEntity.ok(products);
     }
 
     @GetMapping("/orders")
