@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -25,6 +26,7 @@ public class AdminProductResponse {
     private Integer stock;
     private String emoji;
     private String imageUrl;
+    private List<String> imageUrls;
     private String badge;
     private String categoryName;
     private String categorySlug;

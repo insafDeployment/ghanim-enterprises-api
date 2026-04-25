@@ -10,6 +10,7 @@ import lk.ghanim.api.repository.ProductRepository;
 import lk.ghanim.api.dto.request.ProductRequest;
 import lk.ghanim.api.dto.response.ProductResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
@@ -63,6 +65,16 @@ public class ProductService {
         Category category = categoryService
                 .getCategoryById(request.getCategoryId());
 
+        String primaryUrl = null;
+
+        if (request.getImageUrls() != null &&
+        !request.getImageUrls().isEmpty()) {
+            primaryUrl = request.getImageUrls()
+                    .stream()
+                    .filter(url -> url != null && !url.trim().isEmpty())
+                    .findFirst()
+                    .orElse(null);
+        }
         Product product = Product.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -72,9 +84,8 @@ public class ProductService {
                 .costPrice(request.getCostPrice())
                 .stock(request.getStock())
                 .emoji(request.getEmoji())
-                .imageUrl(request.getImageUrls() != null &&
-                        !request.getImageUrls().isEmpty()
-                ? request.getImageUrls().get(0) : null)
+                .imageUrl(primaryUrl)
+                .images(new ArrayList<>())
                 .badge(request.getBadge() != null
                         ? Product.Badge.valueOf(request.getBadge())
                         : null)
@@ -85,11 +96,32 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
 
-        saveProductImages(saved, request.getImageUrls());
 
-        return toResponse(
-                productRepository.findById(saved.getId()).orElseThrow()
-        );
+        // save Images seperately
+
+        if (request.getImageUrls() != null) {
+            List<ProductImage> images = new ArrayList<>();
+            List<String> filtered = request.getImageUrls()
+                    .stream()
+                    .filter(url -> url != null && !url.trim().isEmpty())
+                    .collect(Collectors.toList());
+
+            for (int i = 0; i < filtered.size(); i++) {
+                images.add(ProductImage.builder()
+                        .product(saved)
+                                .imageUrl(filtered.get(i).trim())
+                                .isPrimary(i == 0)
+                                .sortOrder(i)
+                        .build());
+            }
+
+            if (!images.isEmpty()) {
+                productImageRepository.saveAll(images);
+                saved.setImages(images);
+            }
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -111,9 +143,30 @@ public class ProductService {
         product.setSpecifications(request.getSpecifications());
         product.setStock(request.getStock());
         product.setEmoji(request.getEmoji());
-        if (request.getImageUrls() != null &&
-        !request.getImageUrls().isEmpty()) {
-            product.setImageUrl(request.getImageUrls().get(0));
+        product.setBadge(request.getBadge() != null && !request.getBadge().isEmpty()
+                ? Product.Badge.valueOf(request.getBadge())
+                : null);
+        if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
+            List<String> filtered = request.getImageUrls().stream()
+                    .filter(url -> url != null && !url.trim().isEmpty())
+                    .collect(Collectors.toList());
+
+            if (!filtered.isEmpty()) {
+                product.setImageUrl(filtered.get(0));
+                productImageRepository.deleteByProductId(product.getId());
+
+                List<ProductImage> images = new ArrayList<>();
+                for (int i = 0; i < filtered.size(); i++) {
+                    images.add(ProductImage.builder()
+                            .product(product)
+                            .imageUrl(filtered.get(i).trim())
+                            .isPrimary(i == 0)
+                            .sortOrder(i)
+                            .build());
+                }
+                productImageRepository.saveAll(images);
+                product.setImages(images);
+            }
         }
         product.setCategory(category);
         if (request.getBadge() != null) {
@@ -135,15 +188,27 @@ public class ProductService {
     public ProductResponse toResponse(Product product) {
         boolean isWholesale = isCurrentUserWholesale();
 
+        // Safely handle null or empty images
+        List<String> imageUrls = new ArrayList<>();
 
-        // get image urls from product images table
-        List<String> imageUrls = product.getImages()
-                .stream()
-                .sorted(Comparator.comparingInt(
-                        img -> img.getSortOrder() != null ? img.getSortOrder(): 999
-                ))
-                .map(ProductImage::getImageUrl)
-                .collect(Collectors.toList());
+        try {
+            if (product.getImages() != null &&
+                    !product.getImages().isEmpty()) {
+                imageUrls = product.getImages()
+                        .stream()
+                        .filter(img -> img != null &&
+                                img.getImageUrl() != null)
+                        .sorted(Comparator.comparingInt(
+                                img -> img.getSortOrder() != null
+                                        ? img.getSortOrder() : 999
+                        ))
+                        .map(ProductImage::getImageUrl)
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.warn("Could not load images for product {}: {}",
+                    product.getId(), e.getMessage());
+        }
 
         // Fall back to single imageUrl if no images table entries
         if(imageUrls.isEmpty() && product.getImageUrl() != null) {
@@ -189,6 +254,8 @@ public class ProductService {
     ) {
         if (imageUrls == null || imageUrls.isEmpty()) return;
 
+        productImageRepository.deleteByProductId(product.getId());
+
         List<ProductImage> images = new ArrayList<>();
         for (int i = 0; i < imageUrls.size(); i++) {
             String url = imageUrls.get(i);
@@ -203,7 +270,9 @@ public class ProductService {
             }
         }
 
-        productImageRepository.saveAll(images);
+        if (!images.isEmpty()) {
+            productImageRepository.saveAll(images);
+        }
     }
 }
 

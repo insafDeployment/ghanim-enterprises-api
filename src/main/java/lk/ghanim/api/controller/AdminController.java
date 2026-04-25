@@ -5,20 +5,25 @@ import lk.ghanim.api.dto.response.AdminProductResponse;
 import lk.ghanim.api.dto.response.DashboardResponse;
 import lk.ghanim.api.dto.response.OrderResponse;
 import lk.ghanim.api.dto.response.UserResponse;
+import lk.ghanim.api.entity.ProductImage;
 import lk.ghanim.api.entity.User;
 import lk.ghanim.api.repository.ProductRepository;
 import lk.ghanim.api.repository.UserRepository;
 import lk.ghanim.api.service.DashboardService;
 import lk.ghanim.api.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -38,8 +43,7 @@ public class AdminController {
     }
 
     @GetMapping("/products")
-    public ResponseEntity<List<AdminProductResponse>>
-    getAdminProducts() {
+    public ResponseEntity<List<AdminProductResponse>> getAdminProducts() {
         List<AdminProductResponse> products =
                 productRepository.findByActiveTrue()
                         .stream()
@@ -48,15 +52,37 @@ public class AdminController {
                                     ? p.getCostPrice()
                                     : BigDecimal.ZERO;
 
-                            BigDecimal marginRetail = cost.compareTo(
-                                    BigDecimal.ZERO) > 0
+                            BigDecimal marginRetail = cost.compareTo(BigDecimal.ZERO) > 0
                                     ? p.getRetailPrice().subtract(cost)
                                     : null;
 
-                            BigDecimal marginWholesale = cost.compareTo(
-                                    BigDecimal.ZERO) > 0
+                            BigDecimal marginWholesale = cost.compareTo(BigDecimal.ZERO) > 0
                                     ? p.getWholesalePrice().subtract(cost)
                                     : null;
+
+                            // Build imageUrls list
+                            List<String> imageUrls = new ArrayList<>();
+                            try {
+                                if (p.getImages() != null && !p.getImages().isEmpty()) {
+                                    imageUrls = p.getImages()
+                                            .stream()
+                                            .filter(img -> img != null && img.getImageUrl() != null)
+                                            .sorted(Comparator.comparingInt(
+                                                    img -> img.getSortOrder() != null
+                                                            ? img.getSortOrder() : 999
+                                            ))
+                                            .map(ProductImage::getImageUrl)
+                                            .collect(Collectors.toList());
+                                }
+                            } catch (Exception e) {
+                                log.warn("Could not load images for product {}: {}",
+                                        p.getId(), e.getMessage());
+                            }
+
+                            if (imageUrls.isEmpty() && p.getImageUrl() != null) {
+                                imageUrls = List.of(p.getImageUrl());
+                            }
+                            String primaryImageUrl = imageUrls.isEmpty() ? null : imageUrls.get(0);
 
                             return AdminProductResponse.builder()
                                     .id(p.getId())
@@ -70,9 +96,9 @@ public class AdminController {
                                     .profitMarginWholesale(marginWholesale)
                                     .stock(p.getStock())
                                     .emoji(p.getEmoji())
-                                    .imageUrl(p.getImageUrl())
-                                    .badge(p.getBadge() != null
-                                            ? p.getBadge().name() : null)
+                                    .imageUrl(primaryImageUrl)       // updated primary
+                                    .imageUrls(imageUrls)            // new field
+                                    .badge(p.getBadge() != null ? p.getBadge().name() : null)
                                     .categoryName(p.getCategory().getName())
                                     .categorySlug(p.getCategory().getSlug())
                                     .inStock(p.getStock() > 0)
