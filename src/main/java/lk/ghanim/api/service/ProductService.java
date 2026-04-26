@@ -153,7 +153,10 @@ public class ProductService {
 
             if (!filtered.isEmpty()) {
                 product.setImageUrl(filtered.get(0));
-                productImageRepository.deleteByProductId(product.getId());
+
+                // Clear the existing managed collection — do NOT replace it
+                product.getImages().clear();
+                productRepository.save(product); // flush the deletes first
 
                 List<ProductImage> images = new ArrayList<>();
                 for (int i = 0; i < filtered.size(); i++) {
@@ -161,17 +164,14 @@ public class ProductService {
                             .product(product)
                             .imageUrl(filtered.get(i).trim())
                             .isPrimary(i == 0)
-                            .sortOrder(i)
+                            .sortOrder(i + 1)
                             .build());
                 }
-                productImageRepository.saveAll(images);
-                product.setImages(images);
+                product.getImages().addAll(images); // add into the existing managed collection
             }
         }
+
         product.setCategory(category);
-        if (request.getBadge() != null) {
-            product.setBadge(Product.Badge.valueOf(request.getBadge()));
-        }
 
         return toResponse(productRepository.save(product));
     }
