@@ -7,6 +7,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ProductRequest {
@@ -34,6 +35,12 @@ public class ProductRequest {
 
     private String badge;
 
+    private String specifications;
+
+    private BigDecimal costPrice;
+
     @NotNull(message = "Category is required")
     private Long categoryId;
+
+    private List<String> imageUrls;
 }

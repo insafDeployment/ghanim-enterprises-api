@@ -14,6 +14,8 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -46,6 +48,10 @@ public class Product {
 
     private String imageUrl;
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<ProductImage> images = new ArrayList<>();
+
     @Enumerated(EnumType.STRING)
     private Badge badge;
 
@@ -66,6 +72,12 @@ public class Product {
     public enum Badge {
         SALE, NEW, BEST_SELLER
     }
+
+    @Column(columnDefinition = "TEXT")
+    private String specifications;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal costPrice;
 
 //    @Column(columnDefinition = "vector(384)")
 //    @JdbcTypeCode(SqlTypes.VECTOR)
