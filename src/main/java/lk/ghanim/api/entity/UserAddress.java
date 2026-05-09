@@ -10,43 +10,53 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "user_addresses")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class UserAddress {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String firstName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(nullable = false)
-    private String lastName;
-
-    @Column(nullable = false, unique =true)
-    private String email;
+    private String fullName;
 
     @Column(nullable = false)
-    private String password;
-
     private String phone;
+
+    @Column(nullable = false)
+    private String streetAddress;
+
+    private String landmark;
+
+    @Column(nullable = false)
+    private String city;
+
+    @Column(nullable = false)
+    private String district;
+
+    @Column(nullable = false)
+    private String province;
+
+    private String postalCode;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role;
-
-    private String businessName;
-
     @Builder.Default
+    private Label label = Label.HOME;
+
     @Column(nullable = false)
-    private boolean active = true;
+    @Builder.Default
+    private boolean isDefault = false;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -54,10 +64,7 @@ public class User {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<Order> orders;
-
-    public enum Role {
-        RETAIL, WHOLESALE, ADMIN
+    public enum Label {
+        HOME, OFFICE
     }
 }

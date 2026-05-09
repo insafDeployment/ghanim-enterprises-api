@@ -31,6 +31,7 @@ public class Category {
 
     private String emoji;
 
+    @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
 
